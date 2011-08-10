@@ -14,11 +14,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import twitter
-import datetime
-import rfc822
+import tweepy
 import ConfigParser
 import os
+import time
+import utils
+import locale
+
+from threading import Thread
+
+class TweetStream():
+	def __init__(self, tweets):
+		self.ut = utils.Utils()
+		self.tweets = tweets
+		locale.setlocale(locale.LC_ALL, '')
+		self.code = locale.getpreferredencoding()
+	
+	def disp(self):
+		for tweet in self.tweets:
+			print self.ut.bold(tweet.user.name.encode(self.code)),
+			print '@{}'.format(tweet.user.screen_name.encode(self.code)),
+			print '({})'.format(self.ut.human_date(tweet.created_at))
+			print '  {}'.format(tweet.text.encode(self.code))
+	
+	def update(self, tweet):
+		self.tweets.insert(0, tweet)
+		self.tweets = self.tweets[:-1]
+		self.disp()
 
 class TweetRc():
 	def __init__(self):
@@ -48,45 +70,33 @@ class TweetRc():
 		 	self._config.read(os.path.expanduser('~/.ctweetrc'))
 		return self._config
 
-def bold(x):
-	return '\x1b[1m' + x + '\x1b[0m'
-
-def prettydate(d):
-	diff = datetime.datetime.utcnow() - d
-	s = diff.seconds
-
-	if diff.days > 7 or diff.days < 0:
-		return d.strftime('%d %b %y')
-	elif diff.days == 1:
-		return '1 day ago'
-	elif diff.days > 1:
-		return '{} days ago'.format(diff.days)
-	elif s <= 1:
-		return 'just now'
-	elif s < 60:
-		return '{} seconds ago'.format(s)
-	elif s < 120:
-		return '1 minute ago'
-	elif s < 3600:
-		return '{} minutes ago'.format(s/60)
-	elif s < 7200:
-		return '1 hour ago'
-	else:
-		return '{} hours ago'.format(s/3600)
+class StreamListener(tweepy.StreamListener):
+	def on_status(self, status):
+		try:
+			TS.update(status)
+		except Exception, e:
+			print e
 
 def main():
+	global TS
 	rc = TweetRc()
-	api = twitter.Api(consumer_key=rc.GetConsumerKey(),
-					  consumer_secret=rc.GetConsumerSecret(),
-					  access_token_key=rc.GetAccessKey(),
-					  access_token_secret=rc.GetAccessSecret())
-	home_timeline = api.GetHomeTimeline()
 
-	for tweet in home_timeline:
-		created_at = datetime.datetime(*rfc822.parsedate(tweet.created_at)[:-2])
-		print bold(tweet.user.name), '@{0}'.format(tweet.user.screen_name), 
-		print '({0})'.format(prettydate(created_at))
-		print '  ', tweet.text
+	auth = tweepy.OAuthHandler(rc.GetConsumerKey(), rc.GetConsumerSecret())
+	auth.set_access_token(rc.GetAccessKey(), rc.GetAccessSecret())
+
+	api = tweepy.API(auth)
+	os.system('clear')
+	TS = TweetStream(api.home_timeline())
+	TS.disp()
+
+	stream = StreamListener()
+	streamer = tweepy.Stream(auth, stream, secure=True)
+	streamer.userstream()
 
 if __name__ == '__main__':
-	main()
+	TS = None
+	try:
+		main()
+	except KeyboardInterrupt:
+		pass
+	
