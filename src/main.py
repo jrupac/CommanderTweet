@@ -18,12 +18,14 @@ import tweepy
 import ConfigParser
 import os
 import sys
-import time
 import utils
-import locale
+
+_NAME = 'COMMANDER TWEET'
+_VERSION = '0.1'
 
 class TweetStream():
 	def __init__(self, tweets, ut):
+		import locale
 		self.ut = ut
 		self.tweets = tweets
 		locale.setlocale(locale.LC_ALL, '')
@@ -31,18 +33,20 @@ class TweetStream():
 
 	def refresh(self):
 		os.system('clear')
+		print self.ut.bold('\n   ' + _NAME)
+		print self.ut.bold('     Version ' + _VERSION + '\n')
 		for tweet in self.tweets:
-			print self.ut.bold(tweet.user.name.encode(self.code)),
+			print '  ', self.ut.bold(tweet.user.name.encode(self.code)),
 			print '@{}'.format(tweet.user.screen_name.encode(self.code)),
 			print '({})'.format(self.ut.human_date(tweet.created_at))
-			print '  {}'.format(tweet.text.encode(self.code))
+			print '    {}'.format(tweet.text.encode(self.code))
 	
 	def update(self, tweet):
 		self.tweets.insert(0, tweet)
 		self.tweets = self.tweets[:-1]
 		self.refresh()
 
-class TweetRc():
+class TweetRC():
 	def __init__(self):
 		self._config = None
 
@@ -84,18 +88,22 @@ class StreamListener(tweepy.StreamListener):
 def print_prompt(newline=True):
 	if newline:
 		print ''
-	print '[q]uit?',
+	print '[r]efresh, [q]uit:',
 	sys.stdout.flush()
 
-def main():
-	rc = TweetRc()
-	ut = utils.Utils()
-
+def authenticate():
+	rc = TweetRC()
 	auth = tweepy.OAuthHandler(rc.GetConsumerKey(), rc.GetConsumerSecret())
 	auth.set_access_token(rc.GetAccessKey(), rc.GetAccessSecret())
+	return auth
+	
 
+def main():
+	ut = utils.Utils()
+	auth = authenticate()
 	api = tweepy.API(auth)
 	TS = TweetStream(api.home_timeline(), ut)
+
 	TS.refresh()
 	print_prompt()
 
