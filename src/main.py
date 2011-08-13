@@ -17,20 +17,20 @@
 import tweepy
 import ConfigParser
 import os
+import sys
 import time
 import utils
 import locale
 
-from threading import Thread
-
 class TweetStream():
-	def __init__(self, tweets):
-		self.ut = utils.Utils()
+	def __init__(self, tweets, ut):
+		self.ut = ut
 		self.tweets = tweets
 		locale.setlocale(locale.LC_ALL, '')
 		self.code = locale.getpreferredencoding()
-	
-	def disp(self):
+
+	def refresh(self):
+		os.system('clear')
 		for tweet in self.tweets:
 			print self.ut.bold(tweet.user.name.encode(self.code)),
 			print '@{}'.format(tweet.user.screen_name.encode(self.code)),
@@ -40,7 +40,7 @@ class TweetStream():
 	def update(self, tweet):
 		self.tweets.insert(0, tweet)
 		self.tweets = self.tweets[:-1]
-		self.disp()
+		self.refresh()
 
 class TweetRc():
 	def __init__(self):
@@ -71,32 +71,54 @@ class TweetRc():
 		return self._config
 
 class StreamListener(tweepy.StreamListener):
+	def __init__(self, TS):
+		super(StreamListener, self).__init__()
+		self.TS = TS
 	def on_status(self, status):
 		try:
-			TS.update(status)
+			self.TS.update(status)
+			print_prompt()
 		except Exception, e:
 			print e
 
+def print_prompt(newline=True):
+	if newline:
+		print ''
+	print '[q]uit?',
+	sys.stdout.flush()
+
 def main():
-	global TS
 	rc = TweetRc()
+	ut = utils.Utils()
 
 	auth = tweepy.OAuthHandler(rc.GetConsumerKey(), rc.GetConsumerSecret())
 	auth.set_access_token(rc.GetAccessKey(), rc.GetAccessSecret())
 
 	api = tweepy.API(auth)
-	os.system('clear')
-	TS = TweetStream(api.home_timeline())
-	TS.disp()
+	TS = TweetStream(api.home_timeline(), ut)
+	TS.refresh()
+	print_prompt()
 
-	stream = StreamListener()
+	stream = StreamListener(TS)
 	streamer = tweepy.Stream(auth, stream, secure=True)
-	streamer.userstream()
+	streamer.userstream(async=True)
+
+	while True:
+		char = raw_input()
+		if char is 'q':
+			break
+		elif char is 'r':
+			TS.refresh()
+			print_prompt()
+		else:
+			TS.refresh()
+			print ut.bold('Error: could not interpret input.')
+			print_prompt(newline=False)
 
 if __name__ == '__main__':
-	TS = None
 	try:
 		main()
-	except KeyboardInterrupt:
-		pass
+	except Exception, e:
+		''' Break on any error '''
+		print e
 	
